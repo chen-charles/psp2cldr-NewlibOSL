@@ -1,10 +1,10 @@
 #include <psp2cldr/imp_provider.hpp>
 
-#include "../handle.hpp"
+#include <psp2cldr/handle.hpp>
 
 #include <mutex>
 
-static HandleStorage<std::shared_ptr<std::timed_mutex>> mutexes(0x100, 0x7fffffff);
+static HandleStorage<std::shared_ptr<std::timed_mutex>> mutexes(0x100, INT32_MAX);
 
 #undef pte_osMutexCreate
 DEFINE_VITA_IMP_SYM_EXPORT(pte_osMutexCreate)

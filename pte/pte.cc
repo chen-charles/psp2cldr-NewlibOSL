@@ -11,12 +11,15 @@
 std::recursive_mutex threads_lock;
 std::unordered_map<uint32_t, std::shared_ptr<pte_thread>> threads;
 
+uintptr_t tls_lr_page = 0;
+
 #undef pte_osInit
 DEFINE_VITA_IMP_SYM_EXPORT(pte_osInit)
 {
     DECLARE_VITA_IMP_TYPE(FUNCTION);
 
     threads[ctx->thread.tid()] = std::make_shared<pte_thread>();
+    tls_lr_page = ctx->thread.tls.alloc();
 
     TARGET_RETURN(0);
     HANDLER_RETURN(0);
@@ -39,15 +42,14 @@ DEFINE_VITA_IMP_SYM_EXPORT(pte_osThreadCreate)
 
     uint32_t new_pc = PARAM_0;
     uint32_t new_stacksz = PARAM_1;
-    if (new_stacksz < 0x1000)
-        new_stacksz = 0x1000;
+    if (new_stacksz < 0x200000)
+        new_stacksz = 0x200000;
     uint32_t new_priority = PARAM_2;
     uint32_t argv = PARAM_3;
     uint32_t pHandleOut = PARAM_4x(4);
 
-    static const size_t stack_sz = 0x4000;
-    uint32_t sp_base = ctx->coord.mmap(0, stack_sz);
-    uint32_t sp = sp_base + stack_sz;
+    uint32_t sp_base = ctx->coord.mmap(0, new_stacksz);
+    uint32_t sp = sp_base + new_stacksz;
     uint32_t lr = ctx->coord.mmap(0, 0x1000);
 
     size_t succ_counter = 0;
@@ -63,7 +65,7 @@ DEFINE_VITA_IMP_SYM_EXPORT(pte_osThreadCreate)
 
         if (sp != (*thread)[RegisterAccessProxy::Register::SP]->r())
         {
-            std::cout << "stack corruption during thread init routines" << std::endl;
+            std::cerr << "stack corruption during thread init routines" << std::endl;
             HANDLER_RETURN(1);
         }
 
@@ -71,12 +73,12 @@ DEFINE_VITA_IMP_SYM_EXPORT(pte_osThreadCreate)
     }
     if (succ_counter != ctx->load.thread_init_routines.size())
     {
-        std::cout << "thread init routines failed" << std::endl;
+        std::cerr << "thread init routines failed" << std::endl;
         HANDLER_RETURN(2);
     }
-    ctx->coord.munmap(sp_base, stack_sz);
 
-    (*thread)[RegisterAccessProxy::Register::SP]->w(ctx->coord.mmap(0, new_stacksz) + new_stacksz);
+    (*thread)[RegisterAccessProxy::Register::FP]->w(sp_base);
+    (*thread)[RegisterAccessProxy::Register::SP]->w(sp_base + new_stacksz);
     (*thread)[RegisterAccessProxy::Register::LR]->w(lr);
     (*thread)[RegisterAccessProxy::Register::IP]->w(new_pc); // we will store this in IP, start thread will use this value as PC
     (*thread)[RegisterAccessProxy::Register::R0]->w(argv);
@@ -106,18 +108,61 @@ DEFINE_VITA_IMP_SYM_EXPORT(pte_osThreadStart)
 
     if (thread)
     {
+        auto stack_base = (*thread)[RegisterAccessProxy::Register::FP]->r();
+        auto stack_sz = (*thread)[RegisterAccessProxy::Register::SP]->r() - stack_base;
+        auto lr_page = (*thread)[RegisterAccessProxy::Register::LR]->r();
+
+        thread->tls.set(tls_lr_page, lr_page);
+
         thread->start((*thread)[RegisterAccessProxy::Register::IP]->r(), (*thread)[RegisterAccessProxy::Register::LR]->r());
-        std::thread([](ExecutionCoordinator *coord, std::weak_ptr<ExecutionThread> thread)
+        std::thread([stack_base, stack_sz, lr_page](ExecutionCoordinator *coord, std::weak_ptr<ExecutionThread> weak, LoadContext *load)
                     {
-                        if (auto p = thread.lock())
+                        if (auto thread = weak.lock())
                         {
-                            p->join();
+                            thread->join();
+
+                            if (thread->state() != ExecutionThread::THREAD_EXECUTION_STATE::RESTARTABLE)
+                            {
+                                // did not exit gracefully, nothing to do
+                                return;
+                            }
+
+                            uint32_t sp = stack_base + stack_sz;
+                            uint32_t lr = lr_page; // assuming UNTIL_POINT_HIT
+
+                            size_t succ_counter = 0;
+                            for (auto it = load->thread_fini_routines.rbegin(); it != load->thread_fini_routines.rend(); it++)
+                            {
+                                auto &la = *it;
+                                (*thread)[RegisterAccessProxy::Register::SP]->w(sp);
+                                (*thread)[RegisterAccessProxy::Register::LR]->w(lr);
+
+                                uint32_t result;
+                                if (thread->start(la, lr) != ExecutionThread::THREAD_EXECUTION_RESULT::OK || (*thread).join(&result) != ExecutionThread::THREAD_EXECUTION_RESULT::STOP_UNTIL_POINT_HIT || result != 0)
+                                    break;
+                                if (sp != (*thread)[RegisterAccessProxy::Register::SP]->r())
+                                {
+                                    throw std::runtime_error("stack corruption");
+                                }
+
+                                succ_counter++;
+                            }
+
+                            if (succ_counter != load->thread_fini_routines.size())
+                            {
+                                throw std::runtime_error("thread fini routines failed");
+                            }
                         }
-                        coord->thread_destroy(thread);
+
+                        coord->munmap(stack_base, stack_sz);
+                        coord->munmap(lr_page, 0x1000);
+                        coord->thread_destroy(weak);
                     },
-                    &ctx->coord, thread)
+                    &ctx->coord, thread, &ctx->load)
             .detach();
     }
+    else
+        HANDLER_RETURN(1);
 
     TARGET_RETURN(0);
     HANDLER_RETURN(0);
@@ -137,9 +182,7 @@ DEFINE_VITA_IMP_SYM_EXPORT(pte_osThreadExit)
 {
     DECLARE_VITA_IMP_TYPE(FUNCTION);
 
-    ctx->thread.stop();
-
-    // target function must not return
+    ctx->thread[RegisterAccessProxy::Register::PC]->w(ctx->thread.tls.get(tls_lr_page)); // gracefully exit so we can restart it from exit handling thread
     HANDLER_RETURN(0);
 }
 
@@ -148,11 +191,10 @@ DEFINE_VITA_IMP_SYM_EXPORT(pte_osThreadExitAndDelete)
 {
     DECLARE_VITA_IMP_TYPE(FUNCTION);
 
-    ctx->thread.stop();
-
     std::lock_guard guard{threads_lock};
     threads.erase(ctx->thread.tid());
 
+    ctx->thread[RegisterAccessProxy::Register::PC]->w(ctx->thread.tls.get(tls_lr_page));
     HANDLER_RETURN(0);
 }
 
@@ -181,9 +223,6 @@ DEFINE_VITA_IMP_SYM_EXPORT(pte_osThreadSetPriority)
     HANDLER_RETURN(0);
 }
 
-std::mutex cancelled_map_lock;
-std::unordered_map<uint32_t, bool> cancelled_map;
-
 #undef pte_osThreadCancel
 DEFINE_VITA_IMP_SYM_EXPORT(pte_osThreadCancel)
 {
@@ -200,6 +239,8 @@ DEFINE_VITA_IMP_SYM_EXPORT(pte_osThreadCancel)
     {
         thread->cancelled = true;
     }
+    else
+        HANDLER_RETURN(1);
 
     TARGET_RETURN(0);
     HANDLER_RETURN(0);
@@ -250,7 +291,7 @@ DEFINE_VITA_IMP_SYM_EXPORT(pte_osThreadWaitForEnd)
             }
             catch (const std::out_of_range &)
             {
-                std::cout << key << " is not a valid thread handle" << std::endl;
+                std::cerr << key << " is not a valid thread handle" << std::endl;
                 TARGET_RETURN(5);
                 HANDLER_RETURN(0);
             }
@@ -274,6 +315,9 @@ DEFINE_VITA_IMP_SYM_EXPORT(pte_osThreadWaitForEnd)
                     break;
                 }
 
+                bool crash = false;
+                if (crash)
+                    HANDLER_RETURN(5);
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
             }
         }

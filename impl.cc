@@ -1,17 +1,27 @@
 #include <psp2cldr/imp_provider.hpp>
 
 #include <iostream>
+#include <mutex>
 #include <sstream>
 #include <string>
 
+static std::mutex sbrk_lock;
 #undef _sbrk
 DEFINE_VITA_IMP_SYM_EXPORT(_sbrk)
 {
     DECLARE_VITA_IMP_TYPE(FUNCTION);
 
-    auto increment = PARAM_0;
+    int32_t increment = (int32_t)PARAM_0;
+
+    if (increment < 0)
+    {
+        HANDLER_RETURN(1);
+    }
 
     static const uint32_t size = 0x5000000; // 80 MB
+
+    std::lock_guard guard{sbrk_lock};
+
     static uint32_t begin = ctx->coord.mmap(0, size);
     static uint32_t top = begin;
 
@@ -34,7 +44,7 @@ DEFINE_VITA_IMP_SYM_EXPORT(_exit)
 {
     DECLARE_VITA_IMP_TYPE(FUNCTION);
 
-    std::cout << "_exit called, shutting down" << std::endl;
+    std::cerr << "_exit called, shutting down" << std::endl;
     // ctx->coord.thread_stopall(0);
     return std::make_shared<HandlerResult>(1);
 }
@@ -97,29 +107,25 @@ DEFINE_VITA_IMP_SYM_EXPORT(_fork)
     return std::make_shared<HandlerResult>(0);
 }
 
-// #undef __register_frame_info
-// DEFINE_VITA_IMP_SYM_EXPORT(__register_frame_info)
-// {
-//     DECLARE_VITA_IMP_TYPE(FUNCTION);
+#include <chrono>
+#include <thread>
 
-//     ctx->thread[RegisterAccessProxy::Register::PC]->w(ctx->thread[RegisterAccessProxy::Register::LR]->r());
-//     return std::make_shared<HandlerResult>(0);
-// }
+#undef sleep
+DEFINE_VITA_IMP_SYM_EXPORT(sleep)
+{
+    DECLARE_VITA_IMP_TYPE(FUNCTION);
 
-// #undef __cxa_thread_atexit
-// DEFINE_VITA_IMP_SYM_EXPORT(__cxa_thread_atexit)
-// {
-//     DECLARE_VITA_IMP_TYPE(FUNCTION);
+    std::this_thread::sleep_for(std::chrono::seconds(PARAM_0));
+    TARGET_RETURN(0);
+    HANDLER_RETURN(0);
+}
 
-//     TARGET_RETURN(0);
-//     HANDLER_RETURN(0);
-// }
+#undef usleep
+DEFINE_VITA_IMP_SYM_EXPORT(usleep)
+{
+    DECLARE_VITA_IMP_TYPE(FUNCTION);
 
-// #undef __aeabi_atexit
-// DEFINE_VITA_IMP_SYM_EXPORT(__aeabi_atexit)
-// {
-//     DECLARE_VITA_IMP_TYPE(FUNCTION);
-
-//     TARGET_RETURN(0);
-//     HANDLER_RETURN(0);
-// }
+    std::this_thread::sleep_for(std::chrono::microseconds(PARAM_0));
+    TARGET_RETURN(0);
+    HANDLER_RETURN(0);
+}

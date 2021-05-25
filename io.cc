@@ -31,7 +31,7 @@ static std::string translate_path(std::string name, LoadContext &load)
     // auto translated_filename = velf_path.parent_path() / filename.relative_path();
 
     fs::path velf_path{load.main_velf_fullname};
-    return velf_path.parent_path() / std::regex_replace(name, std::regex(":"), "");
+    return (velf_path.parent_path() / std::regex_replace(name, std::regex(":"), "")).string();
 }
 
 #undef _fstat
@@ -122,11 +122,10 @@ DEFINE_VITA_IMP_SYM_EXPORT(_write)
         std::cout << /* "stdout: " << */ buf.get();
         break;
     case 2:
-        std::cout << /* "stderr: " << */ buf.get();
+        std::cerr << /* "stderr: " << */ buf.get();
         break;
     default:
     {
-        std::cout << "_write() called on fd " << fd << ": " << buf.get();
         if (file_mapping.count(fd) != 0)
         {
             auto file = file_mapping.at(fd).second;
@@ -161,7 +160,7 @@ DEFINE_VITA_IMP_SYM_EXPORT(_open)
     }
     else
     {
-        auto ios_mode = std::ios_base::binary;
+        std::ios::openmode ios_mode = std::ios_base::binary;
 
         if (flags & 2)
             ios_mode |= std::ios_base::in | std::ios_base::out;

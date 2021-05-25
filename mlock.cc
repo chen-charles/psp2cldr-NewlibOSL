@@ -2,7 +2,8 @@
 
 #include <mutex>
 
-std::recursive_mutex malloc_lock;
+static std::recursive_mutex malloc_lock;
+
 #undef __malloc_lock
 DEFINE_VITA_IMP_SYM_EXPORT(__malloc_lock)
 {

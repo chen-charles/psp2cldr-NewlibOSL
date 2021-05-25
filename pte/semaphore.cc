@@ -1,6 +1,8 @@
 #include <psp2cldr/imp_provider.hpp>
 
-#include "../handle.hpp"
+#include <psp2cldr/handle.hpp>
+#include <psp2cldr/semaphore.hpp>
+
 #include "thread.hpp"
 
 #include <chrono>
@@ -8,41 +10,7 @@
 #include <mutex>
 #include <thread>
 
-class semaphore
-{
-    std::mutex mutex_;
-    std::condition_variable condition_;
-    unsigned long count_ = 0; // Initialized as locked.
-
-public:
-    void release()
-    {
-        std::lock_guard<decltype(mutex_)> lock(mutex_);
-        ++count_;
-        condition_.notify_one();
-    }
-
-    void acquire()
-    {
-        std::unique_lock<decltype(mutex_)> lock(mutex_);
-        while (!count_) // Handle spurious wake-ups.
-            condition_.wait(lock);
-        --count_;
-    }
-
-    bool try_acquire()
-    {
-        std::lock_guard<decltype(mutex_)> lock(mutex_);
-        if (count_)
-        {
-            --count_;
-            return true;
-        }
-        return false;
-    }
-};
-
-static HandleStorage<std::shared_ptr<semaphore>> semaphores(0x100, 0x7fffffff);
+static HandleStorage<std::shared_ptr<semaphore>> semaphores(0x100, INT32_MAX);
 
 #undef pte_osSemaphoreCreate
 DEFINE_VITA_IMP_SYM_EXPORT(pte_osSemaphoreCreate)
@@ -52,10 +20,7 @@ DEFINE_VITA_IMP_SYM_EXPORT(pte_osSemaphoreCreate)
     uint32_t init_val = PARAM_0;
     uint32_t p_out = PARAM_1;
 
-    auto key = semaphores.alloc(std::make_shared<semaphore>());
-
-    for (int i = 0; i < init_val; i++)
-        semaphores[key]->release();
+    auto key = semaphores.alloc(std::make_shared<semaphore>(init_val));
 
     ctx->coord.proxy().w<uint32_t>(p_out, key);
 
@@ -103,24 +68,16 @@ DEFINE_VITA_IMP_SYM_EXPORT(pte_osSemaphorePend)
         else
         {
             uint32_t nTimeoutMs = ctx->coord.proxy().r<uint32_t>(pTimeout);
-            std::chrono::milliseconds timeout = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()) + std::chrono::milliseconds(nTimeoutMs);
+
             int return_val = 3;
-            bool succ = false;
-            while (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()) < timeout)
+            if (sema->acquire_for(std::chrono::milliseconds(nTimeoutMs)))
             {
-                if (succ = sema->try_acquire())
-                {
-                    return_val = 0;
-                    break;
-                }
-                else
-                    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                return_val = 0;
             }
-
-            if (!succ) // last trial
-                if (succ = sema->try_acquire())
-                    return_val = 0;
-
+            else
+            {
+                return_val = 3;
+            }
             TARGET_RETURN(return_val);
         }
     }
@@ -185,8 +142,8 @@ DEFINE_VITA_IMP_SYM_EXPORT(pte_osSemaphoreCancellablePend)
                 return_val = 0;
                 break;
             }
-            else
-                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
 
         if (!succ) // last trial

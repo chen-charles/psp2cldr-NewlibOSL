@@ -40,11 +40,11 @@ namespace target
 
     typedef unsigned __int16 __nlink_t;
 
-    struct __attribute__((aligned(8))) timespec
-    {
-        time_t tv_sec;
-        int tv_nsec;
-    };
+    //struct __attribute__((aligned(8))) timespec
+    //{
+    //    time_t tv_sec;
+    //    int tv_nsec;
+    //};
 
     typedef __blkcnt_t blkcnt_t;
 
