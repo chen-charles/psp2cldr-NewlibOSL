@@ -301,6 +301,8 @@ DEFINE_VITA_IMP_SYM_EXPORT(pte_osThreadWaitForEnd)
         {
             // this sucks
 
+            std::chrono::milliseconds timeout = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()) + std::chrono::seconds(600);
+
             while (1)
             {
                 if (thread->thread->state() != ExecutionThread::THREAD_EXECUTION_STATE::RUNNING)
@@ -315,10 +317,10 @@ DEFINE_VITA_IMP_SYM_EXPORT(pte_osThreadWaitForEnd)
                     break;
                 }
 
-                bool crash = false;
-                if (crash)
-                    HANDLER_RETURN(5);
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
+                if (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()) > timeout)
+                    HANDLER_RETURN(1);
             }
         }
         else
@@ -359,8 +361,11 @@ DEFINE_VITA_IMP_SYM_EXPORT(_gettimeofday)
     uint32_t tv = PARAM_0;
     uint32_t tz = PARAM_1;
 
-    ctx->coord.proxy().w<uint64_t>(tv, seconds); // tv_seconds;
-    ctx->coord.proxy().w<uint32_t>(tv + sizeof(uint64_t), micros);
+    if (tv)
+    {
+        ctx->coord.proxy().w<uint64_t>(tv, seconds); // tv_seconds;
+        ctx->coord.proxy().w<uint32_t>(tv + sizeof(uint64_t), micros);
+    }
 
     TARGET_RETURN(0);
     HANDLER_RETURN(0);
