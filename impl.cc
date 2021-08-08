@@ -13,17 +13,29 @@ DEFINE_VITA_IMP_SYM_EXPORT(_sbrk)
 
     int32_t increment = (int32_t)PARAM_0;
 
-    if (increment < 0)
-    {
-        HANDLER_RETURN(1);
-    }
-
     static const uint32_t size = 0x5000000; // 80 MB
 
     std::lock_guard guard{sbrk_lock};
 
     static uint32_t begin = ctx->coord.mmap(0, size);
     static uint32_t top = begin;
+
+    if (increment < 0)
+    {
+        int32_t decrement = -increment;
+        if (top - begin >= decrement)
+        {
+            uint32_t prev_top = top;
+            top -= decrement;
+
+            TARGET_RETURN(prev_top);
+            HANDLER_RETURN(0);
+        }
+        else
+        {
+            HANDLER_RETURN(1);
+        }
+    }
 
     if (top + increment < begin + size)
     {
