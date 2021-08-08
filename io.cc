@@ -205,6 +205,7 @@ DEFINE_VITA_IMP_SYM_EXPORT(_read)
         auto file = file_mapping.at(fd).second;
         std::unique_ptr<char[]> buffer(new char[len]);
         file->read(buffer.get(), len);
+        file->clear();
         auto n_read = file->gcount();
         ctx->coord.proxy().copy_in(ptr, buffer.get(), n_read);
         ctx->thread[RegisterAccessProxy::Register::R0]->w(n_read);
@@ -222,12 +223,13 @@ DEFINE_VITA_IMP_SYM_EXPORT(_lseek)
     DECLARE_VITA_IMP_TYPE(FUNCTION);
 
     uint32_t fd = PARAM_0;
-    uint32_t offset = PARAM_1;
+    int32_t offset = PARAM_1;
     uint32_t whence = PARAM_2;
 
     if (file_mapping.count(fd) != 0)
     {
         auto file = file_mapping.at(fd).second;
+        file->clear();
         switch (whence)
         {
         case SEEK_SET:
@@ -240,10 +242,13 @@ DEFINE_VITA_IMP_SYM_EXPORT(_lseek)
             file->seekg(offset, std::ios_base::end);
             break;
         }
+        file->clear();
         ctx->thread[RegisterAccessProxy::Register::R0]->w(file->tellg());
     }
     else
+    {
         ctx->thread[RegisterAccessProxy::Register::R0]->w(-1);
+    }
 
     ctx->thread[RegisterAccessProxy::Register::PC]->w(ctx->thread[RegisterAccessProxy::Register::LR]->r());
     return std::make_shared<HandlerResult>(0);
