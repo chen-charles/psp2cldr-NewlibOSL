@@ -6,6 +6,8 @@
 #include <mutex>
 #include <thread>
 
+#include <psp2cldr/semaphore.hpp>
+
 #include "thread.hpp"
 
 std::recursive_mutex threads_lock;
@@ -115,11 +117,39 @@ DEFINE_VITA_IMP_SYM_EXPORT(pte_osThreadStart)
         thread->tls.set(tls_lr_page, lr_page);
 
         thread->start((*thread)[RegisterAccessProxy::Register::IP]->r(), (*thread)[RegisterAccessProxy::Register::LR]->r());
+        std::shared_ptr<pte_thread> pte_thread_data;
+        {
+            std::lock_guard guard{threads_lock};
+            pte_thread_data = threads.at(thread->tid());
+        }
+        {
+            std::unique_lock guard{pte_thread_data->access_lock};
+            pte_thread_data->started = true;
+        }
+
         std::thread([stack_base, stack_sz, lr_page](ExecutionCoordinator *coord, std::weak_ptr<ExecutionThread> weak, LoadContext *load)
                     {
                         if (auto thread = weak.lock())
                         {
                             thread->join();
+
+                            std::shared_ptr<pte_thread> pte_thread_data;
+                            {
+                                std::lock_guard guard{threads_lock};
+                                pte_thread_data = threads.at(thread->tid());
+                                if (pte_thread_data->delete_on_terminate)
+                                {
+                                    threads.erase(thread->tid());
+                                }
+                            }
+                            {
+                                std::unique_lock guard{pte_thread_data->access_lock};
+                                pte_thread_data->terminated = true;
+                            }
+                            {
+                                std::shared_lock guard{pte_thread_data->access_lock};
+                                pte_thread_data->on_termination.broadcast(pte_thread_data.get());
+                            }
 
                             if (thread->state() != ExecutionThread::THREAD_EXECUTION_STATE::RESTARTABLE)
                             {
@@ -192,7 +222,7 @@ DEFINE_VITA_IMP_SYM_EXPORT(pte_osThreadExitAndDelete)
     DECLARE_VITA_IMP_TYPE(FUNCTION);
 
     std::lock_guard guard{threads_lock};
-    threads.erase(ctx->thread.tid());
+    threads.at(ctx->thread.tid())->delete_on_terminate = true;
 
     ctx->thread[RegisterAccessProxy::Register::PC]->w(ctx->thread.tls.get(tls_lr_page));
     HANDLER_RETURN(0);
@@ -237,7 +267,14 @@ DEFINE_VITA_IMP_SYM_EXPORT(pte_osThreadCancel)
 
     if (thread)
     {
-        thread->cancelled = true;
+        {
+            std::unique_lock guard{thread->access_lock};
+            thread->cancelled = true;
+        }
+        {
+            std::shared_lock guard{thread->access_lock};
+            thread->on_cancellation.broadcast(thread.get());
+        }
     }
     else
         HANDLER_RETURN(1);
@@ -299,28 +336,63 @@ DEFINE_VITA_IMP_SYM_EXPORT(pte_osThreadWaitForEnd)
 
         if (thread)
         {
-            // this sucks
+            bool needs_wait = false;
+            MulticastDelegate<std::function<void(const pte_thread *thread)>>::Token *a = nullptr, *b = nullptr;
 
-            std::chrono::milliseconds timeout = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()) + std::chrono::seconds(600);
-
-            while (1)
+            semaphore waiter(0);
+            bool done = false;
             {
-                if (thread->thread->state() != ExecutionThread::THREAD_EXECUTION_STATE::RUNNING)
+                std::unique_lock guard(thread->access_lock);
+                if (thread->terminated)
                 {
                     result = 0;
-                    break;
+                    done = true;
                 }
+                else
+                {
+                    b = &(thread->on_termination.add([&result, &waiter](const pte_thread *thread) -> void
+                                                     {
+                                                         result = 0;
+                                                         waiter.release();
+                                                     }));
+                }
+            }
 
+            if (!done)
+            {
+                std::unique_lock guard(this_thread->access_lock);
                 if (this_thread->cancelled)
                 {
                     result = 4;
-                    break;
+                    done = true;
                 }
+                else
+                {
+                    a = &(this_thread->on_cancellation.add([&result, &waiter](const pte_thread *thread) -> void
+                                                           {
+                                                               result = 4;
+                                                               waiter.release();
+                                                           }));
+                }
+            }
 
-                std::this_thread::sleep_for(std::chrono::milliseconds(10));
-
-                if (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()) > timeout)
+            if (!done)
+            {
+                if (!waiter.cancellable_acquire_for(std::chrono::seconds(600)))
+                {
+                    // timeout
                     HANDLER_RETURN(1);
+                }
+            }
+
+            if (a)
+            {
+                a->invalidate();
+            }
+
+            if (b)
+            {
+                b->invalidate();
             }
         }
         else

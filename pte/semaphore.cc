@@ -70,7 +70,7 @@ DEFINE_VITA_IMP_SYM_EXPORT(pte_osSemaphorePend)
             uint32_t nTimeoutMs = ctx->coord.proxy().r<uint32_t>(pTimeout);
 
             int return_val = 3;
-            if (sema->acquire_for(std::chrono::milliseconds(nTimeoutMs)))
+            if (sema->cancellable_acquire_for(std::chrono::milliseconds(nTimeoutMs)))
             {
                 return_val = 0;
             }
@@ -125,32 +125,38 @@ DEFINE_VITA_IMP_SYM_EXPORT(pte_osSemaphoreCancellablePend)
         else
             nTimeoutMs = ctx->coord.proxy().r<uint32_t>(pTimeout);
 
-        std::chrono::milliseconds timeout = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()) + std::chrono::milliseconds(nTimeoutMs);
+        std::unique_lock guard{thread->access_lock};
 
-        return_val = 3;
-        bool succ = false;
-        while (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()) < timeout)
+        if (thread->cancelled)
         {
-            if (thread->cancelled)
-            {
-                return_val = 4;
-                goto _cancelled;
-            }
-
-            if (succ = sema->try_acquire())
-            {
-                return_val = 0;
-                break;
-            }
-
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            return_val = 4;
         }
+        else
+        {
+            semaphore::canceler canceler;
+            auto &token = thread->on_cancellation.add([&canceler](const pte_thread *thread)
+                                                      { canceler.cancel(); });
+            canceler.on_completed.add([&token]()
+                                      { token.invalidate(); });
 
-        if (!succ) // last trial
-            if (succ = sema->try_acquire())
+            guard.unlock();
+
+            if (sema->cancellable_acquire_for(std::chrono::milliseconds(nTimeoutMs), canceler))
+            {
                 return_val = 0;
-
-    _cancelled:;
+            }
+            else
+            {
+                if (canceler.is_cancelled())
+                {
+                    return_val = 4;
+                }
+                else
+                {
+                    return_val = 3;
+                }
+            }
+        }
     }
     else
     {
