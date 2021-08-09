@@ -417,6 +417,7 @@ DEFINE_VITA_IMP_SYM_EXPORT(pte_osThreadDelete)
     HANDLER_RETURN(0);
 }
 
+// #include <sys/time.h>
 #undef _gettimeofday
 DEFINE_VITA_IMP_SYM_EXPORT(_gettimeofday)
 {
@@ -435,9 +436,12 @@ DEFINE_VITA_IMP_SYM_EXPORT(_gettimeofday)
 
     if (tv)
     {
-        ctx->coord.proxy().w<uint64_t>(tv, seconds); // tv_seconds;
-        ctx->coord.proxy().w<uint32_t>(tv + sizeof(uint64_t), micros);
+        ctx->coord.proxy().w<uint32_t>(tv, seconds); // tv_seconds;
+        ctx->coord.proxy().w<uint32_t>(tv + sizeof(uint32_t), micros);
     }
+
+    // int r_val = gettimeofday((struct timeval *)tv, (struct timezone *)tz);
+    // TARGET_RETURN(r_val);
 
     TARGET_RETURN(0);
     HANDLER_RETURN(0);
