@@ -96,6 +96,33 @@ DEFINE_VITA_IMP_SYM_EXPORT(pte_osThreadCreate)
     HANDLER_RETURN(0);
 }
 
+#undef pte_osThreadChangeSceArgvPriorToStart
+DEFINE_VITA_IMP_SYM_EXPORT(pte_osThreadChangeSceArgvPriorToStart)
+{
+    DECLARE_VITA_IMP_TYPE(FUNCTION);
+
+    uint32_t key = PARAM_0;
+    std::shared_ptr<pte_thread> thread;
+    {
+        std::lock_guard guard{threads_lock};
+        thread = threads.at(key);
+    }
+
+    int ret_val = 1;
+    {
+        std::unique_lock guard{thread->access_lock};
+        if (!thread->started)
+        {
+            (*(thread->thread))[RegisterAccessProxy::Register::R0]->w(PARAM_1);
+            (*(thread->thread))[RegisterAccessProxy::Register::R1]->w(PARAM_2);
+            ret_val = 0;
+        }
+    }
+
+    TARGET_RETURN(ret_val);
+    HANDLER_RETURN(0);
+}
+
 #undef pte_osThreadStart
 DEFINE_VITA_IMP_SYM_EXPORT(pte_osThreadStart)
 {
