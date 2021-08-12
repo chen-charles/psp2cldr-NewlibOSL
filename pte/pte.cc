@@ -199,7 +199,7 @@ DEFINE_VITA_IMP_SYM_EXPORT(pte_osThreadStart)
                                     break;
                                 if (sp != (*thread)[RegisterAccessProxy::Register::SP]->r())
                                 {
-                                    throw std::runtime_error("stack corruption");
+                                    panic(coord, thread.get(), load, 0xff, "stack corruption");
                                 }
 
                                 succ_counter++;
@@ -207,7 +207,7 @@ DEFINE_VITA_IMP_SYM_EXPORT(pte_osThreadStart)
 
                             if (succ_counter != load->thread_fini_routines.size())
                             {
-                                throw std::runtime_error("thread fini routines failed");
+                                panic(coord, thread.get(), load, 0xff, "thread fini routines failed");
                             }
                         }
 
@@ -407,8 +407,7 @@ DEFINE_VITA_IMP_SYM_EXPORT(pte_osThreadWaitForEnd)
             {
                 if (!waiter.cancellable_acquire_for(std::chrono::seconds(600)))
                 {
-                    // timeout
-                    HANDLER_RETURN(1);
+                    HANDLER_RUNTIME_EXCEPTION("timeout");
                 }
             }
 

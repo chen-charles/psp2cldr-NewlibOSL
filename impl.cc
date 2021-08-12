@@ -40,15 +40,15 @@ DEFINE_VITA_IMP_SYM_EXPORT(_sbrk)
     if (top + increment < begin + size)
     {
         ctx->thread[RegisterAccessProxy::Register::R0]->w(top);
+        TARGET_RETURN(top);
         top += increment;
     }
     else
     {
         std::cerr << "heap overflow detected!" << std::endl;
-        ctx->thread[RegisterAccessProxy::Register::R0]->w(-1);
+        TARGET_RETURN(-1);
     }
-    ctx->thread[RegisterAccessProxy::Register::PC]->w(ctx->thread[RegisterAccessProxy::Register::LR]->r());
-    return std::make_shared<HandlerResult>(0);
+    HANDLER_RETURN(0);
 }
 
 #undef _exit
@@ -56,9 +56,7 @@ DEFINE_VITA_IMP_SYM_EXPORT(_exit)
 {
     DECLARE_VITA_IMP_TYPE(FUNCTION);
 
-    std::cerr << "_exit called, shutting down" << std::endl;
-    // ctx->coord.thread_stopall(0);
-    return std::make_shared<HandlerResult>(1);
+    HANDLER_RUNTIME_EXCEPTION("_exit called, shutting down");
 }
 
 #undef _getpid
@@ -67,7 +65,7 @@ DEFINE_VITA_IMP_SYM_EXPORT(_getpid)
     DECLARE_VITA_IMP_TYPE(FUNCTION);
 
     TARGET_RETURN(42);
-    return std::make_shared<HandlerResult>(0);
+    HANDLER_RETURN(0);
 }
 
 #undef _times
@@ -76,7 +74,7 @@ DEFINE_VITA_IMP_SYM_EXPORT(_times)
     DECLARE_VITA_IMP_TYPE(FUNCTION);
 
     TARGET_RETURN(-1);
-    return std::make_shared<HandlerResult>(0);
+    HANDLER_RETURN(0);
 }
 
 #undef _wait
@@ -84,9 +82,8 @@ DEFINE_VITA_IMP_SYM_EXPORT(_wait)
 {
     DECLARE_VITA_IMP_TYPE(FUNCTION);
 
-    ctx->thread[RegisterAccessProxy::Register::R0]->w(-1);
-    ctx->thread[RegisterAccessProxy::Register::PC]->w(ctx->thread[RegisterAccessProxy::Register::LR]->r());
-    return std::make_shared<HandlerResult>(0);
+    TARGET_RETURN(-1);
+    HANDLER_RETURN(0);
 }
 
 #undef _kill
@@ -94,9 +91,8 @@ DEFINE_VITA_IMP_SYM_EXPORT(_kill)
 {
     DECLARE_VITA_IMP_TYPE(FUNCTION);
 
-    ctx->thread[RegisterAccessProxy::Register::R0]->w(-1);
-    ctx->thread[RegisterAccessProxy::Register::PC]->w(ctx->thread[RegisterAccessProxy::Register::LR]->r());
-    return std::make_shared<HandlerResult>(0);
+    TARGET_RETURN(-1);
+    HANDLER_RETURN(0);
 }
 
 #undef _execve
@@ -104,9 +100,8 @@ DEFINE_VITA_IMP_SYM_EXPORT(_execve)
 {
     DECLARE_VITA_IMP_TYPE(FUNCTION);
 
-    ctx->thread[RegisterAccessProxy::Register::R0]->w(-1);
-    ctx->thread[RegisterAccessProxy::Register::PC]->w(ctx->thread[RegisterAccessProxy::Register::LR]->r());
-    return std::make_shared<HandlerResult>(0);
+    TARGET_RETURN(-1);
+    HANDLER_RETURN(0);
 }
 
 #undef _fork
@@ -114,9 +109,8 @@ DEFINE_VITA_IMP_SYM_EXPORT(_fork)
 {
     DECLARE_VITA_IMP_TYPE(FUNCTION);
 
-    ctx->thread[RegisterAccessProxy::Register::R0]->w(-1);
-    ctx->thread[RegisterAccessProxy::Register::PC]->w(ctx->thread[RegisterAccessProxy::Register::LR]->r());
-    return std::make_shared<HandlerResult>(0);
+    TARGET_RETURN(-1);
+    HANDLER_RETURN(0);
 }
 
 #include <chrono>
