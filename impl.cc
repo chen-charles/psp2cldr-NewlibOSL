@@ -135,3 +135,13 @@ DEFINE_VITA_IMP_SYM_EXPORT(usleep)
     TARGET_RETURN(0);
     HANDLER_RETURN(0);
 }
+
+#undef nanosleep
+DEFINE_VITA_IMP_SYM_EXPORT(nanosleep)
+{
+    DECLARE_VITA_IMP_TYPE(FUNCTION);
+
+    std::this_thread::sleep_for(std::chrono::microseconds(PARAM_0));
+    TARGET_RETURN(0);
+    HANDLER_RETURN(0);
+}

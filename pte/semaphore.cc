@@ -139,9 +139,7 @@ DEFINE_VITA_IMP_SYM_EXPORT(pte_osSemaphoreCancellablePend)
             canceler.on_completed.add([&token]()
                                       { token.invalidate(); });
 
-            guard.unlock();
-
-            if (sema->cancellable_acquire_for(std::chrono::milliseconds(nTimeoutMs), canceler))
+            if (sema->cancellable_acquire_for(std::chrono::milliseconds(nTimeoutMs), guard, canceler))
             {
                 return_val = 0;
             }

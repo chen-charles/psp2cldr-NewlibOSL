@@ -199,7 +199,7 @@ DEFINE_VITA_IMP_SYM_EXPORT(pte_osThreadStart)
                                     break;
                                 if (sp != (*thread)[RegisterAccessProxy::Register::SP]->r())
                                 {
-                                    panic(coord, thread.get(), load, 0xff, "stack corruption");
+                                    coord->panic(thread.get(), load, 0xff, "stack corruption");
                                 }
 
                                 succ_counter++;
@@ -207,14 +207,13 @@ DEFINE_VITA_IMP_SYM_EXPORT(pte_osThreadStart)
 
                             if (succ_counter != load->thread_fini_routines.size())
                             {
-                                panic(coord, thread.get(), load, 0xff, "thread fini routines failed");
+                                coord->panic(thread.get(), load, 0xff, "thread fini routines failed");
                             }
                         }
 
                         coord->munmap(stack_base, stack_sz);
                         coord->munmap(lr_page, 0x1000);
-                        coord->thread_destroy(weak);
-                    },
+                        coord->thread_destroy(weak); },
                     &ctx->coord, thread, &ctx->load)
             .detach();
     }
@@ -380,8 +379,7 @@ DEFINE_VITA_IMP_SYM_EXPORT(pte_osThreadWaitForEnd)
                     b = &(thread->on_termination.add([&result, &waiter](const pte_thread *thread) -> void
                                                      {
                                                          result = 0;
-                                                         waiter.release();
-                                                     }));
+                                                         waiter.release(); }));
                 }
             }
 
@@ -398,8 +396,7 @@ DEFINE_VITA_IMP_SYM_EXPORT(pte_osThreadWaitForEnd)
                     a = &(this_thread->on_cancellation.add([&result, &waiter](const pte_thread *thread) -> void
                                                            {
                                                                result = 4;
-                                                               waiter.release();
-                                                           }));
+                                                               waiter.release(); }));
                 }
             }
 
@@ -445,31 +442,26 @@ DEFINE_VITA_IMP_SYM_EXPORT(pte_osThreadDelete)
     HANDLER_RETURN(0);
 }
 
-// #include <sys/time.h>
 #undef _gettimeofday
 DEFINE_VITA_IMP_SYM_EXPORT(_gettimeofday)
 {
     DECLARE_VITA_IMP_TYPE(FUNCTION);
 
-    auto tp = std::chrono::system_clock::now();
-    auto dtn = tp.time_since_epoch();
-    auto seconds = dtn.count() * std::chrono::system_clock::period::num / std::chrono::system_clock::period::den;
+    const auto epoch = std::chrono::system_clock::now().time_since_epoch();
+    uint64_t seconds = std::chrono::duration_cast<std::chrono::seconds>(epoch).count();
 
-    auto micros = std::chrono::duration_cast<std::chrono::microseconds>(dtn).count();
+    uint64_t micros = std::chrono::duration_cast<std::chrono::microseconds>(epoch).count();
     micros -= seconds * 1000000;
-    assert(micros <= 0xffffffff);
 
     uint32_t tv = PARAM_0;
     uint32_t tz = PARAM_1;
 
     if (tv)
     {
-        ctx->coord.proxy().w<uint32_t>(tv, seconds); // tv_seconds;
-        ctx->coord.proxy().w<uint32_t>(tv + sizeof(uint32_t), micros);
+        // note: make sure the types here matches target newlib's configuration
+        ctx->coord.proxy().w<uint64_t>(tv, seconds); // tv_seconds;
+        ctx->coord.proxy().w<uint32_t>(tv + sizeof(uint64_t), (uint32_t)micros);
     }
-
-    // int r_val = gettimeofday((struct timeval *)tv, (struct timezone *)tz);
-    // TARGET_RETURN(r_val);
 
     TARGET_RETURN(0);
     HANDLER_RETURN(0);
