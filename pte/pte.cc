@@ -402,12 +402,7 @@ DEFINE_VITA_IMP_SYM_EXPORT(pte_osThreadWaitForEnd)
 
             if (!done)
             {
-                if (!waiter.cancellable_acquire_for(std::chrono::seconds(600)))
-                {
-                    std::stringstream ss;
-                    ss << "timeout, target thread = " << u32_str_repr(thread->thread->tid()) << " from thread = " << u32_str_repr(this_thread->thread->tid());
-                    HANDLER_RUNTIME_EXCEPTION(ss.str());
-                }
+                waiter.acquire();
             }
 
             if (a)
