@@ -442,7 +442,7 @@ DEFINE_VITA_IMP_SYM_EXPORT(_gettimeofday)
 {
     DECLARE_VITA_IMP_TYPE(FUNCTION);
 
-    const auto epoch = std::chrono::system_clock::now().time_since_epoch();
+    const auto epoch = std::chrono::steady_clock::now().time_since_epoch();
     uint64_t seconds = std::chrono::duration_cast<std::chrono::seconds>(epoch).count();
 
     uint64_t micros = std::chrono::duration_cast<std::chrono::microseconds>(epoch).count();
