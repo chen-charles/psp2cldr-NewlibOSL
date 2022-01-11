@@ -1,94 +1,41 @@
-#ifndef NEWLIBOSL_TARGET_H
-#define NEWLIBOSL_TARGET_H
-
-namespace target
+struct timespec
 {
-#define __int8 char
-#define __int16 short
-#define __int32 int
-#define __int64 long long
+	/* typedef time_t -> __int_least64_t */ long long int tv_sec; /*     0     8 */
+	long int tv_nsec;											  /*     8     4 */
 
-    typedef int _off_t;
-
-    typedef unsigned __int8 __uint8_t;
-
-    typedef unsigned int __uint32_t;
-
-    typedef __uint8_t uint8_t;
-
-    typedef __int64 __int_least64_t;
-
-    typedef __int_least64_t time_t;
-
-    typedef _off_t __off_t;
-
-    typedef __off_t off_t;
-
-    typedef int __blkcnt_t;
-
-    typedef int __blksize_t;
-
-    typedef __int16 __dev_t;
-
-    typedef unsigned __int16 __uid_t;
-
-    typedef unsigned __int16 __gid_t;
-
-    typedef unsigned __int16 __ino_t;
-
-    typedef __uint32_t __mode_t;
-
-    typedef unsigned __int16 __nlink_t;
-
-    //struct __attribute__((aligned(8))) timespec
-    //{
-    //    time_t tv_sec;
-    //    int tv_nsec;
-    //};
-
-    typedef __blkcnt_t blkcnt_t;
-
-    typedef __blksize_t blksize_t;
-
-    typedef __ino_t ino_t;
-
-    typedef __dev_t dev_t;
-
-    typedef __uid_t uid_t;
-
-    typedef __gid_t gid_t;
-
-    typedef __mode_t mode_t;
-
-    typedef __nlink_t nlink_t;
-
-    struct stat
-    {
-        dev_t st_dev;
-        ino_t st_ino;
-        mode_t st_mode;
-        nlink_t st_nlink;
-        uid_t st_uid;
-        gid_t st_gid;
-        dev_t st_rdev;
-        off_t st_size;
-        timespec st_atim;
-        timespec st_mtim;
-        timespec st_ctim;
-        blksize_t st_blksize;
-        blkcnt_t st_blocks;
-        int st_spare4[2];
-    };
-
-    typedef unsigned int clock_t;
-
-    struct tms
-    {
-        clock_t tms_utime;
-        clock_t tms_stime;
-        clock_t tms_cutime;
-        clock_t tms_cstime;
-    };
-
+	/* size: 16, cachelines: 1, members: 2 */
+	/* padding: 4 */
+	/* last cacheline: 16 bytes */
 };
-#endif
+
+struct stat
+{
+	/* typedef dev_t -> __dev_t */ short int st_dev;					 /*     0     2 */
+	/* typedef ino_t -> __ino_t */ short unsigned int st_ino;			 /*     2     2 */
+	/* typedef mode_t -> __mode_t -> __uint32_t */ unsigned int st_mode; /*     4     4 */
+	/* typedef nlink_t -> __nlink_t */ short unsigned int st_nlink;		 /*     8     2 */
+	/* typedef uid_t -> __uid_t */ short unsigned int st_uid;			 /*    10     2 */
+	/* typedef gid_t -> __gid_t */ short unsigned int st_gid;			 /*    12     2 */
+	/* typedef dev_t -> __dev_t */ short int st_rdev;					 /*    14     2 */
+	/* typedef off_t -> __off_t -> _off_t */ long int st_size;			 /*    16     4 */
+	struct timespec st_atim;											 /*    20    16 */
+
+	/* XXX last struct has 4 bytes of padding */
+
+	struct timespec st_mtim; /*    36    16 */
+
+	/* XXX last struct has 4 bytes of padding */
+
+	struct timespec st_ctim; /*    52    16 */ /*    52    16 */
+
+	/* XXX last struct has 4 bytes of padding */
+
+	/* --- cacheline 1 boundary (64 bytes) was 4 bytes ago --- */
+	/* typedef blksize_t -> __blksize_t */ long int st_blksize; /*    68     4 */
+	/* typedef blkcnt_t -> __blkcnt_t */ long int st_blocks;	/*    72     4 */
+	long int st_spare4[2];										/*    76     8 */
+
+	/* size: 84, cachelines: 2, members: 14 */
+	/* paddings: 3, sum paddings: 12 */
+	/* last cacheline: 20 bytes */
+} __attribute__((__packed__));

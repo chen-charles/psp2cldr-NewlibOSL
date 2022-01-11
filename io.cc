@@ -17,7 +17,10 @@ namespace fs = std::experimental::filesystem;
 #include <regex>
 #include <unordered_map>
 
+namespace target
+{
 #include "target.hpp"
+}
 
 std::unordered_map<uint32_t, std::pair<std::string, std::shared_ptr<std::fstream>>> file_mapping;
 std::atomic<uint32_t> fd_ctr{3};
