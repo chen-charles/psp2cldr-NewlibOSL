@@ -458,6 +458,13 @@ DEFINE_VITA_IMP_SYM_EXPORT(_gettimeofday)
         ctx->coord.proxy().w<uint32_t>(tv + sizeof(uint64_t), (uint32_t)micros);
     }
 
+    if (tz)
+    {
+        // obsolete
+        ctx->coord.proxy().w<uint32_t>(tz, 0);
+        ctx->coord.proxy().w<uint32_t>(tz + sizeof(uint32_t), 0);
+    }
+
     TARGET_RETURN(0);
     HANDLER_RETURN(0);
 }
