@@ -143,7 +143,12 @@ DEFINE_VITA_IMP_SYM_EXPORT(pte_osThreadStart)
 
         thread->tls.set(tls_lr_page, lr_page);
 
-        thread->start((*thread)[RegisterAccessProxy::Register::IP]->r(), (*thread)[RegisterAccessProxy::Register::LR]->r());
+        ExecutionThread::THREAD_EXECUTION_RESULT start_result = thread->start((*thread)[RegisterAccessProxy::Register::IP]->r(), (*thread)[RegisterAccessProxy::Register::LR]->r());
+        if (start_result != ExecutionThread::THREAD_EXECUTION_RESULT::OK)
+        {
+            HANDLER_RETURN(1);
+        }
+        
         std::shared_ptr<pte_thread> pte_thread_data;
         {
             std::lock_guard guard{threads_lock};

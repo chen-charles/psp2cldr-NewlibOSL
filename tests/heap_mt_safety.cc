@@ -8,7 +8,7 @@ static const size_t nThreads = 30;
 
 std::atomic<bool> aborted{false};
 std::atomic<uint32_t> ctr{0};
-extern "C" void _start()
+static void __attribute__((constructor)) test_heap_mt_safety()
 {
     std::vector<std::shared_ptr<std::thread>> threads;
 
