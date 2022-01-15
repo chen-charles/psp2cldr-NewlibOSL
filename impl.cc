@@ -45,7 +45,7 @@ DEFINE_VITA_IMP_SYM_EXPORT(_sbrk)
     }
     else
     {
-        std::cerr << "heap overflow detected!" << std::endl;
+        std::cerr << "ran out of heap" << std::endl;
         TARGET_RETURN(-1);
     }
     HANDLER_RETURN(0);

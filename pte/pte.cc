@@ -146,7 +146,8 @@ DEFINE_VITA_IMP_SYM_EXPORT(pte_osThreadStart)
         ExecutionThread::THREAD_EXECUTION_RESULT start_result = thread->start((*thread)[RegisterAccessProxy::Register::IP]->r(), (*thread)[RegisterAccessProxy::Register::LR]->r());
         if (start_result != ExecutionThread::THREAD_EXECUTION_RESULT::OK)
         {
-            HANDLER_RETURN(1);
+            std::cerr << "thread start failed" << std::endl;
+            HANDLER_RETURN(2);
         }
         
         std::shared_ptr<pte_thread> pte_thread_data;
@@ -359,7 +360,6 @@ DEFINE_VITA_IMP_SYM_EXPORT(pte_osThreadWaitForEnd)
             }
             catch (const std::out_of_range &)
             {
-                std::cerr << key << " is not a valid thread handle" << std::endl;
                 TARGET_RETURN(5);
                 HANDLER_RETURN(0);
             }
