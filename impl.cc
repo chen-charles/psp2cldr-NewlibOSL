@@ -31,7 +31,7 @@ DEFINE_VITA_IMP_SYM_EXPORT(_sbrk)
 
     int32_t increment = (int32_t)PARAM_0;
 
-    static const uint32_t size = 0x5000000; // 80 MB
+    static const uint32_t size = 0x28000000; // 640 MB
 
     std::lock_guard guard{sbrk_lock};
 
