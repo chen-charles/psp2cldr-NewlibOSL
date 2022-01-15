@@ -40,7 +40,7 @@ static void __attribute__((constructor)) test_gettimeofday()
 {
     struct timeval tv1 = gettimeofday_safe();
 
-    for (int i = 0; i < 10; i++)
+    for (int i = 0; i < 40; i++)
     {
         usleep(100000); // 100ms
 

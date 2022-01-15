@@ -32,7 +32,7 @@ static void __attribute__((constructor)) test_busy_threads()
 
     for (int j = 0; j < ITERATIONS; j++)
     {
-        printf("iteration %d\n", j);
+        printf("busy_threads iteration %d\n", j);
 
         __atomic_store_n(&serialThreadCount, 0, __ATOMIC_SEQ_CST);
 
