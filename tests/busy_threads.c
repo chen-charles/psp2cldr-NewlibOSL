@@ -1,7 +1,6 @@
 /**
- * 
  * arm-vita-eabi-gcc -shared -O3 -o busy_threads.so ./busy_threads.c -pthread
- */ 
+ */
 
 #include <assert.h>
 #include <pthread.h>
@@ -11,7 +10,7 @@
 static pthread_barrier_t barrier;
 static atomic_int serialThreadCount;
 
-static void* func(void *arg)
+static void *func(void *arg)
 {
     int result = pthread_barrier_wait(&barrier);
 

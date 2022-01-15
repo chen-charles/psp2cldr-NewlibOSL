@@ -5,7 +5,7 @@ project(NewlibOSL)
 set (CMAKE_CXX_STANDARD 20)
 
 add_library(${PROJECT_NAME} SHARED
-    impl.cc io.cc pte/pte.cc mlock.cc pte/mutex.cc pte/semaphore.cc
+    impl.cc io.cc mlock.cc pte/pte.cc pte/mutex.cc pte/semaphore.cc pte/thread.hpp target.h
 )
 
 if(MSVC)

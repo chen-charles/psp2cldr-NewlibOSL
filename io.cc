@@ -1,3 +1,21 @@
+/**
+ * psp2cldr-NewlibOSL: psp2cldr Newlib OS Support Reference Implementation
+ * Copyright (C) 2022 Jianye Chen
+
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 #include <psp2cldr/imp_provider.hpp>
 
 #if defined(_MSC_VER) || (__GNUC__ >= 8)
@@ -8,18 +26,17 @@ namespace fs = std::filesystem;
 namespace fs = std::experimental::filesystem;
 #endif
 
-#include <iostream>
-#include <sstream>
-#include <string>
-
 #include <atomic>
 #include <fstream>
+#include <iostream>
 #include <regex>
+#include <sstream>
+#include <string>
 #include <unordered_map>
 
 namespace target
 {
-#include "target.hpp"
+#include "target.h"
 }
 
 std::unordered_map<uint32_t, std::pair<std::string, std::shared_ptr<std::fstream>>> file_mapping;
@@ -127,8 +144,7 @@ DEFINE_VITA_IMP_SYM_EXPORT(_write)
     case 2:
         std::cerr << /* "stderr: " << */ buf.get();
         break;
-    default:
-    {
+    default: {
         if (file_mapping.count(fd) != 0)
         {
             auto file = file_mapping.at(fd).second;

@@ -1,3 +1,21 @@
+/**
+ * psp2cldr-NewlibOSL: psp2cldr Newlib OS Support Reference Implementation
+ * Copyright (C) 2022 Jianye Chen
+
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 #include <psp2cldr/imp_provider.hpp>
 
 #include <cassert>
@@ -62,7 +80,8 @@ DEFINE_VITA_IMP_SYM_EXPORT(pte_osThreadCreate)
         (*thread)[RegisterAccessProxy::Register::LR]->w(lr);
 
         uint32_t result;
-        if (thread->start(la, lr) != ExecutionThread::THREAD_EXECUTION_RESULT::OK || (*thread).join(&result) != ExecutionThread::THREAD_EXECUTION_RESULT::STOP_UNTIL_POINT_HIT)
+        if (thread->start(la, lr) != ExecutionThread::THREAD_EXECUTION_RESULT::OK ||
+            (*thread).join(&result) != ExecutionThread::THREAD_EXECUTION_RESULT::STOP_UNTIL_POINT_HIT)
             break;
 
         if (sp != (*thread)[RegisterAccessProxy::Register::SP]->r())
@@ -82,7 +101,8 @@ DEFINE_VITA_IMP_SYM_EXPORT(pte_osThreadCreate)
     (*thread)[RegisterAccessProxy::Register::FP]->w(sp_base);
     (*thread)[RegisterAccessProxy::Register::SP]->w(sp_base + new_stacksz);
     (*thread)[RegisterAccessProxy::Register::LR]->w(lr);
-    (*thread)[RegisterAccessProxy::Register::IP]->w(new_pc); // we will store this in IP, start thread will use this value as PC
+    (*thread)[RegisterAccessProxy::Register::IP]->w(
+        new_pc); // we will store this in IP, start thread will use this value as PC
     (*thread)[RegisterAccessProxy::Register::R0]->w(argv);
 
     {
@@ -143,13 +163,14 @@ DEFINE_VITA_IMP_SYM_EXPORT(pte_osThreadStart)
 
         thread->tls.set(tls_lr_page, lr_page);
 
-        ExecutionThread::THREAD_EXECUTION_RESULT start_result = thread->start((*thread)[RegisterAccessProxy::Register::IP]->r(), (*thread)[RegisterAccessProxy::Register::LR]->r());
+        ExecutionThread::THREAD_EXECUTION_RESULT start_result = thread->start(
+            (*thread)[RegisterAccessProxy::Register::IP]->r(), (*thread)[RegisterAccessProxy::Register::LR]->r());
         if (start_result != ExecutionThread::THREAD_EXECUTION_RESULT::OK)
         {
             std::cerr << "thread start failed" << std::endl;
             HANDLER_RETURN(2);
         }
-        
+
         std::shared_ptr<pte_thread> pte_thread_data;
         {
             std::lock_guard guard{threads_lock};
@@ -160,67 +181,71 @@ DEFINE_VITA_IMP_SYM_EXPORT(pte_osThreadStart)
             pte_thread_data->started = true;
         }
 
-        std::thread([stack_base, stack_sz, lr_page](ExecutionCoordinator *coord, std::weak_ptr<ExecutionThread> weak, LoadContext *load)
+        std::thread(
+            [stack_base, stack_sz, lr_page](ExecutionCoordinator *coord, std::weak_ptr<ExecutionThread> weak,
+                                            LoadContext *load) {
+                if (auto thread = weak.lock())
+                {
+                    thread->join();
+
+                    std::shared_ptr<pte_thread> pte_thread_data;
                     {
-                        if (auto thread = weak.lock())
+                        std::lock_guard guard{threads_lock};
+                        pte_thread_data = threads.at(thread->tid());
+                        if (pte_thread_data->delete_on_terminate)
                         {
-                            thread->join();
+                            threads.erase(thread->tid());
+                        }
+                    }
+                    {
+                        std::unique_lock guard{pte_thread_data->access_lock};
+                        pte_thread_data->terminated = true;
+                    }
+                    {
+                        std::shared_lock guard{pte_thread_data->access_lock};
+                        pte_thread_data->on_termination.broadcast(pte_thread_data.get());
+                    }
 
-                            std::shared_ptr<pte_thread> pte_thread_data;
-                            {
-                                std::lock_guard guard{threads_lock};
-                                pte_thread_data = threads.at(thread->tid());
-                                if (pte_thread_data->delete_on_terminate)
-                                {
-                                    threads.erase(thread->tid());
-                                }
-                            }
-                            {
-                                std::unique_lock guard{pte_thread_data->access_lock};
-                                pte_thread_data->terminated = true;
-                            }
-                            {
-                                std::shared_lock guard{pte_thread_data->access_lock};
-                                pte_thread_data->on_termination.broadcast(pte_thread_data.get());
-                            }
+                    if (thread->state() != ExecutionThread::THREAD_EXECUTION_STATE::RESTARTABLE)
+                    {
+                        // did not exit gracefully, nothing to do
+                        return;
+                    }
 
-                            if (thread->state() != ExecutionThread::THREAD_EXECUTION_STATE::RESTARTABLE)
-                            {
-                                // did not exit gracefully, nothing to do
-                                return;
-                            }
+                    uint32_t sp = stack_base + stack_sz;
+                    uint32_t lr = lr_page; // assuming UNTIL_POINT_HIT
 
-                            uint32_t sp = stack_base + stack_sz;
-                            uint32_t lr = lr_page; // assuming UNTIL_POINT_HIT
+                    size_t succ_counter = 0;
+                    for (auto it = load->thread_fini_routines.rbegin(); it != load->thread_fini_routines.rend(); it++)
+                    {
+                        auto &la = *it;
+                        (*thread)[RegisterAccessProxy::Register::SP]->w(sp);
+                        (*thread)[RegisterAccessProxy::Register::LR]->w(lr);
 
-                            size_t succ_counter = 0;
-                            for (auto it = load->thread_fini_routines.rbegin(); it != load->thread_fini_routines.rend(); it++)
-                            {
-                                auto &la = *it;
-                                (*thread)[RegisterAccessProxy::Register::SP]->w(sp);
-                                (*thread)[RegisterAccessProxy::Register::LR]->w(lr);
-
-                                uint32_t result;
-                                if (thread->start(la, lr) != ExecutionThread::THREAD_EXECUTION_RESULT::OK || (*thread).join(&result) != ExecutionThread::THREAD_EXECUTION_RESULT::STOP_UNTIL_POINT_HIT || result != 0)
-                                    break;
-                                if (sp != (*thread)[RegisterAccessProxy::Register::SP]->r())
-                                {
-                                    coord->panic(thread.get(), load, 0xff, "stack corruption");
-                                }
-
-                                succ_counter++;
-                            }
-
-                            if (succ_counter != load->thread_fini_routines.size())
-                            {
-                                coord->panic(thread.get(), load, 0xff, "thread fini routines failed");
-                            }
+                        uint32_t result;
+                        if (thread->start(la, lr) != ExecutionThread::THREAD_EXECUTION_RESULT::OK ||
+                            (*thread).join(&result) != ExecutionThread::THREAD_EXECUTION_RESULT::STOP_UNTIL_POINT_HIT ||
+                            result != 0)
+                            break;
+                        if (sp != (*thread)[RegisterAccessProxy::Register::SP]->r())
+                        {
+                            coord->panic(thread.get(), load, 0xff, "stack corruption");
                         }
 
-                        coord->munmap(stack_base, stack_sz);
-                        coord->munmap(lr_page, 0x1000);
-                        coord->thread_destroy(weak); },
-                    &ctx->coord, thread, &ctx->load)
+                        succ_counter++;
+                    }
+
+                    if (succ_counter != load->thread_fini_routines.size())
+                    {
+                        coord->panic(thread.get(), load, 0xff, "thread fini routines failed");
+                    }
+                }
+
+                coord->munmap(stack_base, stack_sz);
+                coord->munmap(lr_page, 0x1000);
+                coord->thread_destroy(weak);
+            },
+            &ctx->coord, thread, &ctx->load)
             .detach();
     }
     else
@@ -244,7 +269,8 @@ DEFINE_VITA_IMP_SYM_EXPORT(pte_osThreadExit)
 {
     DECLARE_VITA_IMP_TYPE(FUNCTION);
 
-    ctx->thread[RegisterAccessProxy::Register::PC]->w(ctx->thread.tls.get(tls_lr_page)); // gracefully exit so we can restart it from exit handling thread
+    ctx->thread[RegisterAccessProxy::Register::PC]->w(
+        ctx->thread.tls.get(tls_lr_page)); // gracefully exit so we can restart it from exit handling thread
     HANDLER_RETURN(0);
 }
 
@@ -381,10 +407,10 @@ DEFINE_VITA_IMP_SYM_EXPORT(pte_osThreadWaitForEnd)
                 }
                 else
                 {
-                    b = &(thread->on_termination.add([&result, &waiter](const pte_thread *thread) -> void
-                                                     {
-                                                         result = 0;
-                                                         waiter.release(); }));
+                    b = &(thread->on_termination.add([&result, &waiter](const pte_thread *thread) -> void {
+                        result = 0;
+                        waiter.release();
+                    }));
                 }
             }
 
@@ -398,10 +424,10 @@ DEFINE_VITA_IMP_SYM_EXPORT(pte_osThreadWaitForEnd)
                 }
                 else
                 {
-                    a = &(this_thread->on_cancellation.add([&result, &waiter](const pte_thread *thread) -> void
-                                                           {
-                                                               result = 4;
-                                                               waiter.release(); }));
+                    a = &(this_thread->on_cancellation.add([&result, &waiter](const pte_thread *thread) -> void {
+                        result = 4;
+                        waiter.release();
+                    }));
                 }
             }
 
