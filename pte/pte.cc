@@ -468,6 +468,11 @@ DEFINE_VITA_IMP_SYM_EXPORT(pte_osThreadDelete)
     HANDLER_RETURN(0);
 }
 
+namespace target
+{
+#include "../target.h"
+}
+
 #undef _gettimeofday
 DEFINE_VITA_IMP_SYM_EXPORT(_gettimeofday)
 {
@@ -486,8 +491,9 @@ DEFINE_VITA_IMP_SYM_EXPORT(_gettimeofday)
     {
         // note: make sure the types here matches target newlib's configuration
         // "pahole -a -d -E -C timespec ./libc.so"
-        ctx->coord.proxy().w<uint64_t>(tv, seconds); // tv_seconds;
-        ctx->coord.proxy().w<uint32_t>(tv + sizeof(uint64_t), (uint32_t)micros);
+        ctx->coord.proxy().w<decltype(target::timespec::tv_sec)>(tv, seconds); // tv_seconds;
+        ctx->coord.proxy().w<decltype(target::timespec::tv_nsec)>(tv + sizeof(decltype(target::timespec::tv_sec)),
+                                                                  (decltype(target::timespec::tv_nsec))micros);
     }
 
     if (tz)

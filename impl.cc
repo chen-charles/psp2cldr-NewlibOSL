@@ -66,6 +66,7 @@ DEFINE_VITA_IMP_SYM_EXPORT(_sbrk)
         std::cerr << "ran out of heap" << std::endl;
         TARGET_RETURN(-1);
     }
+
     HANDLER_RETURN(0);
 }
 
@@ -154,12 +155,42 @@ DEFINE_VITA_IMP_SYM_EXPORT(usleep)
     HANDLER_RETURN(0);
 }
 
+namespace target
+{
+#include "target.h"
+}
+
 #undef nanosleep
 DEFINE_VITA_IMP_SYM_EXPORT(nanosleep)
 {
     DECLARE_VITA_IMP_TYPE(FUNCTION);
 
-    std::this_thread::sleep_for(std::chrono::microseconds(PARAM_0));
-    TARGET_RETURN(0);
-    HANDLER_RETURN(0);
+    uint32_t p_req = PARAM_0;
+    uint32_t p_rem = PARAM_1;
+
+    if (p_req)
+    {
+        target::timespec ts;
+        ctx->coord.proxy().copy_out(&ts, p_req, sizeof(ts));
+        if (ts.tv_nsec < 0 || ts.tv_nsec > 999999999 || ts.tv_sec < 0)
+        {
+            return ctx->handler_call_target_function("__errno")->then(
+                [&, p_req](uint32_t result, InterruptContext *ctx) {
+                    ctx->coord.proxy().w<uint32_t>(result, 22 /* EINVAL */);
+                    TARGET_RETURN(-1);
+                    HANDLER_RETURN(0);
+                });
+        }
+
+        auto tts = std::chrono::microseconds(ts.tv_nsec) + std::chrono::seconds(ts.tv_sec);
+        std::this_thread::sleep_for(tts);
+        TARGET_RETURN(0);
+        HANDLER_RETURN(0);
+    }
+
+    return ctx->handler_call_target_function("__errno")->then([&, p_req](uint32_t result, InterruptContext *ctx) {
+        ctx->coord.proxy().w<uint32_t>(result, 14 /* EFAULT */);
+        TARGET_RETURN(-1);
+        HANDLER_RETURN(0);
+    });
 }
