@@ -1,7 +1,6 @@
 /**
  * _gettimeofday
  *
- * objective:
  * 1. assert _gettimeofday does not overrun buffer (leads to a stack corruption)
  * 2. assert time moves forward (pthread-embedded depends on time to move forward, or "pthread_timechange_handler_np"
  * must be called)
