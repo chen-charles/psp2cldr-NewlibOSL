@@ -491,9 +491,9 @@ DEFINE_VITA_IMP_SYM_EXPORT(_gettimeofday)
     {
         // note: make sure the types here matches target newlib's configuration
         // "pahole -a -d -E -C timespec ./libc.so"
-        ctx->coord.proxy().w<decltype(target::timespec::tv_sec)>(tv, seconds); // tv_seconds;
-        ctx->coord.proxy().w<decltype(target::timespec::tv_nsec)>(tv + sizeof(decltype(target::timespec::tv_sec)),
-                                                                  (decltype(target::timespec::tv_nsec))micros);
+        ctx->coord.proxy().w<decltype(target::timeval::tv_sec)>(tv, seconds); // tv_seconds;
+        ctx->coord.proxy().w<decltype(target::timeval::tv_usec)>(tv + sizeof(decltype(target::timeval::tv_sec)),
+                                                                 (decltype(target::timeval::tv_usec))micros);
     }
 
     if (tz)

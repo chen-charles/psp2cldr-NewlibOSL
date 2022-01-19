@@ -135,26 +135,6 @@ DEFINE_VITA_IMP_SYM_EXPORT(_fork)
 #include <chrono>
 #include <thread>
 
-#undef sleep
-DEFINE_VITA_IMP_SYM_EXPORT(sleep)
-{
-    DECLARE_VITA_IMP_TYPE(FUNCTION);
-
-    std::this_thread::sleep_for(std::chrono::seconds(PARAM_0));
-    TARGET_RETURN(0);
-    HANDLER_RETURN(0);
-}
-
-#undef usleep
-DEFINE_VITA_IMP_SYM_EXPORT(usleep)
-{
-    DECLARE_VITA_IMP_TYPE(FUNCTION);
-
-    std::this_thread::sleep_for(std::chrono::microseconds(PARAM_0));
-    TARGET_RETURN(0);
-    HANDLER_RETURN(0);
-}
-
 namespace target
 {
 #include "target.h"
@@ -182,7 +162,7 @@ DEFINE_VITA_IMP_SYM_EXPORT(nanosleep)
                 });
         }
 
-        auto tts = std::chrono::microseconds(ts.tv_nsec) + std::chrono::seconds(ts.tv_sec);
+        auto tts = std::chrono::nanoseconds(ts.tv_nsec) + std::chrono::seconds(ts.tv_sec);
         std::this_thread::sleep_for(tts);
         TARGET_RETURN(0);
         HANDLER_RETURN(0);
