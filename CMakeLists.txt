@@ -10,6 +10,7 @@ add_library(${PROJECT_NAME} SHARED
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(PSP2CLDR REQUIRED psp2cldr)
+
 target_link_libraries(${PROJECT_NAME} ${PSP2CLDR_LIBRARIES})
 target_include_directories(${PROJECT_NAME} PUBLIC ${PSP2CLDR_INCLUDE_DIRS})
 target_compile_options(${PROJECT_NAME} PUBLIC ${PSP2CLDR_CFLAGS_OTHER})
