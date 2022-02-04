@@ -18,7 +18,7 @@
 
 #include <psp2cldr/imp_provider.hpp>
 
-#include <psp2cldr/handle.hpp>
+#include <psp2cldr/utility/handle.hpp>
 
 #include <mutex>
 

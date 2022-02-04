@@ -173,6 +173,8 @@ DEFINE_VITA_IMP_SYM_EXPORT(_open)
     auto filename_cstr = ctx->read_str(name);
     auto translated = translate_path(filename_cstr, ctx->load);
 
+    std::cout << "_open() called: " << filename_cstr << std::endl;
+
     if (!fs::exists(translated))
     {
         ctx->thread[RegisterAccessProxy::Register::R0]->w(-1);

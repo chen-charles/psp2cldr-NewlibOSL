@@ -18,8 +18,8 @@
 
 #include <psp2cldr/imp_provider.hpp>
 
-#include <psp2cldr/handle.hpp>
-#include <psp2cldr/semaphore.hpp>
+#include <psp2cldr/utility/handle.hpp>
+#include <psp2cldr/utility/semaphore.hpp>
 
 #include "thread.hpp"
 

@@ -32,6 +32,7 @@ DEFINE_VITA_IMP_SYM_EXPORT(_sbrk)
     int32_t increment = (int32_t)PARAM_0;
 
     static const uint32_t size = 0x28000000; // 640 MB
+    // static const uint32_t size = 0x80000000;
 
     std::lock_guard guard{sbrk_lock};
 
@@ -43,10 +44,8 @@ DEFINE_VITA_IMP_SYM_EXPORT(_sbrk)
         int32_t decrement = -increment;
         if (top - begin >= decrement)
         {
-            uint32_t prev_top = top;
+            TARGET_RETURN(top);
             top -= decrement;
-
-            TARGET_RETURN(prev_top);
             HANDLER_RETURN(0);
         }
         else
@@ -57,14 +56,19 @@ DEFINE_VITA_IMP_SYM_EXPORT(_sbrk)
 
     if (top + increment < begin + size)
     {
-        ctx->thread[RegisterAccessProxy::Register::R0]->w(top);
         TARGET_RETURN(top);
         top += increment;
     }
     else
     {
         std::cerr << "ran out of heap" << std::endl;
-        TARGET_RETURN(-1);
+
+        return ctx->handler_call_target_function("__errno")->then([&](uint32_t result, InterruptContext *ctx) {
+            ctx->coord.proxy().w<uint32_t>(result, 12 /* ENOMEM */);
+
+            TARGET_RETURN(-1);
+            HANDLER_RETURN(0);
+        });
     }
 
     HANDLER_RETURN(0);

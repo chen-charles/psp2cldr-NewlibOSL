@@ -24,7 +24,7 @@
 #include <mutex>
 #include <thread>
 
-#include <psp2cldr/semaphore.hpp>
+#include <psp2cldr/utility/semaphore.hpp>
 
 #include "thread.hpp"
 

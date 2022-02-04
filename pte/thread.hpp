@@ -26,7 +26,7 @@
 #include <shared_mutex>
 #include <unordered_map>
 
-#include <psp2cldr/delegate.hpp>
+#include <psp2cldr/utility/delegate.hpp>
 
 class ExecutionThread;
 
