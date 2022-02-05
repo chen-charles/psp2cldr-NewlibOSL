@@ -114,9 +114,16 @@ DEFINE_VITA_IMP_SYM_EXPORT(pte_osSemaphoreDelete)
 
     uint32_t key = PARAM_0;
 
-    semaphores.free(key);
+    if (auto sema = semaphores[key])
+    {
+        semaphores.free(key);
+        TARGET_RETURN(0);
+    }
+    else
+    {
+        TARGET_RETURN(5);
+    }
 
-    TARGET_RETURN(0);
     HANDLER_RETURN(0);
 }
 

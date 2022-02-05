@@ -74,8 +74,10 @@ DEFINE_VITA_IMP_SYM_EXPORT(pte_osThreadCreate)
 
     size_t succ_counter = 0;
     auto thread = ctx->coord.thread_create();
-    for (auto &la : ctx->load.thread_init_routines)
+    for (auto &item : ctx->load.thread_init_routines)
     {
+        auto la = item.first;
+
         (*thread)[RegisterAccessProxy::Register::SP]->w(sp);
         (*thread)[RegisterAccessProxy::Register::LR]->w(lr);
 
@@ -92,6 +94,7 @@ DEFINE_VITA_IMP_SYM_EXPORT(pte_osThreadCreate)
 
         succ_counter++;
     }
+
     if (succ_counter != ctx->load.thread_init_routines.size())
     {
         std::cerr << "thread init routines failed" << std::endl;
@@ -218,15 +221,16 @@ DEFINE_VITA_IMP_SYM_EXPORT(pte_osThreadStart)
                     size_t succ_counter = 0;
                     for (auto it = load->thread_fini_routines.rbegin(); it != load->thread_fini_routines.rend(); it++)
                     {
-                        auto &la = *it;
+                        auto &item = *it;
+                        auto la = item.first;
                         (*thread)[RegisterAccessProxy::Register::SP]->w(sp);
                         (*thread)[RegisterAccessProxy::Register::LR]->w(lr);
 
                         uint32_t result;
                         if (thread->start(la, lr) != ExecutionThread::THREAD_EXECUTION_RESULT::OK ||
-                            (*thread).join(&result) != ExecutionThread::THREAD_EXECUTION_RESULT::STOP_UNTIL_POINT_HIT ||
-                            result != 0)
+                            (*thread).join(&result) != ExecutionThread::THREAD_EXECUTION_RESULT::STOP_UNTIL_POINT_HIT)
                             break;
+
                         if (sp != (*thread)[RegisterAccessProxy::Register::SP]->r())
                         {
                             coord->panic(thread.get(), load, 0xff, "stack corruption");
@@ -269,8 +273,8 @@ DEFINE_VITA_IMP_SYM_EXPORT(pte_osThreadExit)
 {
     DECLARE_VITA_IMP_TYPE(FUNCTION);
 
-    ctx->thread[RegisterAccessProxy::Register::PC]->w(
-        ctx->thread.tls.get(tls_lr_page)); // gracefully exit so we can restart it from exit handling thread
+    // gracefully exit so we can restart it from exit handling thread
+    ctx->thread[RegisterAccessProxy::Register::PC]->w(ctx->thread.tls.get(tls_lr_page));
     HANDLER_RETURN(0);
 }
 
