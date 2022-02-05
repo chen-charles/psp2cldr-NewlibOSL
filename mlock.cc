@@ -1,10 +1,10 @@
 /**
- * psp2cldr-NewlibOSL: Newlib OS Support Reference Implementation
+ * psp2cldr-NewlibOSL: psp2cldr Newlib OS Support Reference Implementation
  * Copyright (C) 2022 Jianye Chen
 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
+ * the Free Software Foundation, either version 2 of the License, or
  * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,

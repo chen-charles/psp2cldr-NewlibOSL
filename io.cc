@@ -4,7 +4,7 @@
 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
+ * the Free Software Foundation, either version 2 of the License, or
  * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
@@ -139,7 +139,8 @@ DEFINE_VITA_IMP_SYM_EXPORT(_write)
         std::cout << "_write() called on stdin: " << buf.get();
         break;
     case 1:
-        std::cout << /* "stdout: " << */ buf.get();
+        std::cout << /* "stdout: " << */
+            buf.get();
         break;
     case 2:
         std::cerr << /* "stderr: " << */ buf.get();
