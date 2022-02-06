@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.13)
 
 project(NewlibOSL)
 
@@ -8,8 +8,19 @@ add_library(${PROJECT_NAME} SHARED
     impl.cc io.cc mlock.cc pte/pte.cc pte/mutex.cc pte/semaphore.cc pte/thread.hpp target.h
 )
 
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(PSP2CLDR REQUIRED psp2cldr)
+if (NOT ${psp2cldr_FOUND})
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(PSP2CLDR QUIET psp2cldr)
+
+    if (NOT ${psp2cldr_FOUND})
+        Include(FetchContent)
+        FetchContent_Declare(
+            psp2cldr
+            GIT_REPOSITORY https://github.com/chen-charles/psp2cldr
+        )
+        FetchContent_MakeAvailable(psp2cldr)
+    endif()
+endif()
 
 target_link_libraries(${PROJECT_NAME} ${PSP2CLDR_LIBRARIES})
 target_include_directories(${PROJECT_NAME} PUBLIC ${PSP2CLDR_INCLUDE_DIRS})

@@ -47,11 +47,11 @@ static std::string translate_path(std::string name, LoadContext &load)
     // fs::path filename{name};
     // auto root_name = filename.root_name(); // app0 savedata0 etc.
 
-    // fs::path velf_path{ctx->load.main_velf_fullname};
-    // auto translated_filename = velf_path.parent_path() / filename.relative_path();
-
-    fs::path velf_path{load.main_velf_fullname};
-    return (velf_path.parent_path() / std::regex_replace(name, std::regex(":"), "")).string();
+    if (load.additional_options.contains("--sysroot"))
+    {
+        return (fs::path(load.additional_options["--sysroot"]) / std::regex_replace(name, std::regex(":"), "")).string();
+    }
+    return (fs::current_path() / std::regex_replace(name, std::regex(":"), "")).string();
 }
 
 #undef _fstat
