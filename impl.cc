@@ -32,12 +32,24 @@ DEFINE_VITA_IMP_SYM_EXPORT(_sbrk)
     int32_t increment = (int32_t)PARAM_0;
 
     static const uint32_t size = 0x28000000; // 640 MB
-    // static const uint32_t size = 0x80000000;
+    // static const uint32_t size = 0x8000000; // 128 MB
 
     std::lock_guard guard{sbrk_lock};
 
     static uint32_t begin = ctx->coord.mmap(0, size);
     static uint32_t top = begin;
+
+    if (begin == 0)
+    {
+        std::cerr << "sbrk failed because the initial allocation failed" << std::endl;
+
+        return ctx->handler_call_target_function("__errno")->then([&](uint32_t result, InterruptContext *ctx) {
+            ctx->coord.proxy().w<uint32_t>(result, 12 /* ENOMEM */);
+
+            TARGET_RETURN(-1);
+            HANDLER_RETURN(0);
+        });
+    }
 
     if (increment < 0)
     {
