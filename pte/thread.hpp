@@ -53,6 +53,11 @@ class pte_thread
     bool cancelled{false};
     bool terminated{false};
 
+    // async cancel
+    bool is_async_cancel = false;
+    uint32_t async_cancel_continuation = 0;
+    uint32_t async_cancel_continuation_arg = 0;
+
     MulticastDelegate<std::function<void(const pte_thread *thread)>> on_cancellation;
     MulticastDelegate<std::function<void(const pte_thread *thread)>> on_termination;
 

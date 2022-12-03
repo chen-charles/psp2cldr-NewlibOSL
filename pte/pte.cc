@@ -195,13 +195,32 @@ DEFINE_VITA_IMP_SYM_EXPORT(pte_osThreadStart)
                     {
                         std::lock_guard guard{threads_lock};
                         pte_thread_data = threads.at(thread->tid());
-                        if (pte_thread_data->delete_on_terminate)
-                        {
-                            threads.erase(thread->tid());
-                        }
                     }
                     {
                         std::unique_lock guard{pte_thread_data->access_lock};
+                        if (pte_thread_data->is_async_cancel)
+                        {
+                            (*thread)[RegisterAccessProxy::Register::R0]->w(
+                                pte_thread_data->async_cancel_continuation_arg);
+                            guard.unlock();
+                            if (thread->start(pte_thread_data->async_cancel_continuation, lr_page) !=
+                                    ExecutionThread::THREAD_EXECUTION_RESULT::OK ||
+                                (*thread).join() != ExecutionThread::THREAD_EXECUTION_RESULT::STOP_UNTIL_POINT_HIT)
+                            {
+                                coord->panic(thread.get(), load, 0xff,
+                                             "attempted async cancel does not hit until point");
+                            }
+                        }
+                    }
+
+                    if (pte_thread_data->delete_on_terminate)
+                    {
+                        std::lock_guard guard{threads_lock};
+                        threads.erase(thread->tid());
+                    }
+
+                    {
+                        std::shared_lock guard{pte_thread_data->access_lock};
                         pte_thread_data->terminated = true;
                     }
                     {
@@ -467,6 +486,36 @@ DEFINE_VITA_IMP_SYM_EXPORT(pte_osThreadDelete)
 
     std::lock_guard guard{threads_lock};
     threads.erase(PARAM_0);
+
+    TARGET_RETURN(0);
+    HANDLER_RETURN(0);
+}
+
+#undef pte_osThreadAsyncCancel
+DEFINE_VITA_IMP_SYM_EXPORT(pte_osThreadAsyncCancel)
+{
+    DECLARE_VITA_IMP_TYPE(FUNCTION);
+
+    uint32_t key = PARAM_0;
+    std::shared_ptr<pte_thread> thread;
+    {
+        std::lock_guard guard{threads_lock};
+        thread = threads.at(key);
+    }
+
+    if (thread)
+    {
+        std::unique_lock guard(thread->access_lock);
+        if (!thread->is_async_cancel)
+        {
+            thread->is_async_cancel = true;
+            thread->async_cancel_continuation = PARAM_1;
+            thread->async_cancel_continuation_arg = PARAM_2;
+            thread->thread->stop();
+        }
+    }
+    else
+        HANDLER_RETURN(5);
 
     TARGET_RETURN(0);
     HANDLER_RETURN(0);
