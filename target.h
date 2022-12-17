@@ -8,6 +8,7 @@ struct timeval
     /* padding: 4 */
     /* last cacheline: 16 bytes */
 };
+static_assert(sizeof(struct timeval) == 16);
 
 struct timespec
 {
@@ -18,9 +19,10 @@ struct timespec
     /* padding: 4 */
     /* last cacheline: 16 bytes */
 };
+static_assert(sizeof(struct timespec) == 16);
 
 #ifdef _MSC_VER
-#pragma pack(push, 1)
+#pragma pack(push, 2)
 #endif
 
 struct stat
@@ -58,7 +60,7 @@ struct stat
 __attribute__((__packed__))
 #endif
 ;
-
 #ifdef _MSC_VER
 #pragma pack(pop)
 #endif
+static_assert(sizeof(struct stat) == 84);
