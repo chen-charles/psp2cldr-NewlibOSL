@@ -28,6 +28,7 @@ target_compile_options(${PROJECT_NAME} PUBLIC ${PSP2CLDR_CFLAGS_OTHER})
 
 if(MSVC)
     add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
+    set_target_properties(${PROJECT_NAME} PROPERTIES COMPILE_FLAGS "/GS /std:c++20 /EHsc /EHa")
 else()
     add_definitions(-fvisibility=hidden)
     target_link_libraries(${PROJECT_NAME} PRIVATE stdc++fs)

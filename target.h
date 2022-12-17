@@ -19,6 +19,10 @@ struct timespec
     /* last cacheline: 16 bytes */
 };
 
+#ifdef _MSC_VER
+#pragma pack(push, 1)
+#endif
+
 struct stat
 {
     /* typedef dev_t -> __dev_t */ short int st_dev;                     /*     0     2 */
@@ -49,4 +53,12 @@ struct stat
     /* size: 84, cachelines: 2, members: 14 */
     /* paddings: 3, sum paddings: 12 */
     /* last cacheline: 20 bytes */
-} __attribute__((__packed__));
+}
+#ifndef _MSC_VER
+__attribute__((__packed__))
+#endif
+;
+
+#ifdef _MSC_VER
+#pragma pack(pop)
+#endif
